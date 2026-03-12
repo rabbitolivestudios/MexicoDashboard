@@ -577,15 +577,19 @@ export default function Dashboard() {
 
         {/* Trade Intelligence Note */}
         <div style={{ marginTop: 16, background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 12, padding: "14px 20px" }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#92400e", marginBottom: 6 }}>Trade Intelligence Notes — SE Catalog (Mexico 2026)</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#92400e", marginBottom: 6 }}>Trade Intelligence Notes — Pr&aacute;cticas Desleales (Dec 17, 2024) &amp; SE Catalog</div>
           <div style={{ fontSize: 12, color: "#78350f", lineHeight: 1.6 }}>
-            <strong>Source: Secretar&iacute;a de Econom&iacute;a (SE) — Catalog of Approved Mills.</strong> FTA partners: <strong>T-MEC/USMCA</strong> (USA, Canada), <strong>TLCUEM</strong> (EU), <strong>CPTPP</strong> (Japan, Australia, etc.) enjoy <strong>0% preferential tariff</strong>.
+            <strong>Sources: SE Catalog of Approved Mills + Pr&aacute;cticas Desleales de Comercio Exterior (Dec 17, 2024).</strong>{" "}
+            FTA partners: <strong>T-MEC/USMCA</strong> (USA, Canada), <strong>TLCUEM</strong> (EU), <strong>CPTPP</strong> (Japan, Australia, etc.) enjoy <strong>0% preferential tariff</strong>.
             Non-FTA countries face <strong>25-50% MFN tariffs</strong> under the 2026 LIGIE reform.{" "}
-            <strong>Anti-dumping duties (A/D):</strong>{" "}
-            HRC — China $354/mt, Germany $133-166/mt, France $75.59/mt, Russia 21%, Ukraine 25%.{" "}
-            CRC — China 65.39-103.91%, South Korea quota 700k mt, Russia 15%.{" "}
-            Coated — China 22.26-76.33%.{" "}
-            Plate — Russia 12.5-36.8%, Romania $0.676/mt.
+            <strong>Active A/D cases (27 of 47):</strong>{" "}
+            Coated Flat Steel — China 22.26-76.33%, Vietnam 2.06-10.84%.{" "}
+            CRC — Russia 15%, Kazakhstan 22%, S. Korea quota system, Vietnam 11.64-79.24%.{" "}
+            Seamless Pipe — China US$1,569/ton, S. Korea US$0.13/kg, Spain US$1.87/kg, India US$0.21/kg, Ukraine US$0.17/kg.{" "}
+            Steel Beams — Germany US$0.11/kg, Spain US$0.06/kg, UK US$0.13/kg.{" "}
+            Stainless Flat — China US$0.63/kg, Taiwan US$0.05-0.61/kg.{" "}
+            Steel Nails — China 31%. Threaded Rod — China 8-91%. Welded Pipe — China US$0.36-0.62/kg.{" "}
+            Slab — Brazil/Russia under investigation. 20 cases eliminated/expired since 2020 (incl. HRC, Sheet Plate, Wire Rod, Rebar).
           </div>
         </div>
 
