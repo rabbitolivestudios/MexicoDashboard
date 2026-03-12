@@ -260,40 +260,62 @@ export default function Dashboard() {
     return Object.entries(pc).sort((a, b) => a[0].localeCompare(b[0])).map(([p]) => p);
   }, []);
 
-  // Products grouped by steel type category for the dropdown
+  // Hardcoded product-to-category mapping based on steel industry classification
   const groupedProducts = useMemo(() => {
-    // Build product -> set of steelTypes mapping
-    const productTypes = {};
-    MILLS.forEach(m => m.products.forEach(p => {
-      if (!productTypes[p]) productTypes[p] = new Set();
-      productTypes[p].add(m.simpleType);
-    }));
-    // Define groups with their products
-    const groups = [
-      { label: "Flats", color: COLORS.Flats, types: ["Flats"] },
-      { label: "Longs", color: COLORS.Longs, types: ["Longs"] },
-      { label: "Flats & Longs", color: COLORS["Flats & Longs"], types: ["Flats & Longs"] },
-      { label: "Stainless", color: COLORS.Stainless, types: ["Stainless", "Stainless / Special"] },
-      { label: "Pipes / Tubes", color: COLORS["Pipes / Tubes"], types: ["Pipes / Tubes"] },
-      { label: "Special / SBQ", color: COLORS["Special / SBQ"], types: ["Special / SBQ"] },
-      { label: "Semis / DRI", color: "#6b7280", types: ["Semis / DRI"] },
-      { label: "Heavy Plates", color: COLORS["Heavy Plates"], types: ["Heavy Plates"] },
-      { label: "Service Centers", color: COLORS["Service Centers"], types: ["Service Centers"] },
+    const catOf = (p) => {
+      const pl = p.toLowerCase();
+      // Stainless first (most specific)
+      if (pl.startsWith("stainless") || /specialty stainless/i.test(p)) return "Stainless";
+      // Pipes / Tubes
+      if (/pipe|tube|octg|hollow section|hss|hsaw|lsaw|cdw|drill pipe|ductile iron/i.test(p)) return "Pipes / Tubes";
+      // Heavy Plates (before Flats so plates don't get caught)
+      if (/^Plates$|heavy plate|medium.*plate|quarto plate|quenched.*tempered plate|cut-to-length plate|coil plate|plate.*tmcp|structural steel plate|specialty plate|wear-resistant plate|steel plate|pipe plate|tool steel plate/i.test(p)) return "Heavy Plates";
+      // Longs
+      if (/\bh-beam|beam|wide flange|wire rod|rebar|rebars|tmt bar|section|heavy section|structural.*shape|structural.*section|structural beam|structural steel$|channel|angle|rail|sheet pile|merchant bar|profile|roll-formed|shape|rod\b/i.test(p)
+        && !/flat/i.test(p) && !/strip/i.test(p) && !/sheet(?!.*pile)/i.test(p)) return "Longs";
+      if (/^(Bars|Round Bars|Rounds|Bright Bars|Cold Finished Bars|Engineered Bars|Bars-in-Coil|Calibrated Bars|Squares|Flats|Mesh|Wire Mesh|Wire|Wire Forms|Wire Products|Copper-Coated Wire|Fine Wire|Specialty Wire|Specialty Wire Components|Bolts|Fasteners|Threaded Products|Forgings|Rings|Shafts|Spring|Spring Steel|Grinding Bars)$/i.test(p)) return "Longs";
+      // Flats
+      if (/\bhrc\b|crc\b|hdg\b|ppgi|ppga|tinplate|eccs|tfs|galvanized steel|color coated|coated product|aluminized|aluzinc|pre-coated|electrical steel|flat product|sheet(?!.*pile)|coil(?!.*plate)|strip(?!.*stainless)|narrow strip|hot-rolled strip|cold-rolled strip|hr narrow|packaging$|blanking|compact coil|automotive steel sheet|steel strapping|high-strength steel|automotive steel$|coin blank/i.test(p)) return "Flats";
+      if (/^(Coils|Sheets|Strip|Strip Steel|Alloy Strip|Bimetal Strip|Precision Strip|Precision Strips|Specialty Strip|Specialty Alloy Strip|CR Coils|Coil|Flat Products \(Distribution\)|Flat Products \(Processing\)|Flat Products \(Trading\)|CRC \(Distribution\)|HDG \(Electro-Galvanized\)|HDG \(Processing\)|PPGI \(Processing\)|Packaging Materials|Clad Steel|Shutters|NOES\)|Electrical Steel \(GOES|Electrical Steel \(GOES\))$/i.test(p)) return "Flats";
+      // Semis / DRI
+      if (/\bslab|billet|bloom|dri\b|hbi\b|pig iron|nickel pig iron|ferro alloy|ingot|forged ingot|steel.*titanium slag/i.test(p)) return "Semis / DRI";
+      // Special / SBQ
+      if (/\bsbq\b|tool steel|bearing steel|die steel|high-speed steel|special steel|specialty steel|alloy steel|engineering steel|case hardening|through hardening|esr.*var|special bar|specialty bar|rock drill/i.test(p)) return "Special / SBQ";
+      if (/alloy bar|specialty alloy bar|cast iron bar|precision ground bar|bright steel/i.test(p)) return "Special / SBQ";
+      if (/superalloy|hastelloy|inconel|monel|titanium|nickel alloy|special alloy|specialty alloy(?!.*strip)|high-temperature alloy|heat-resistant alloy|amorphous|soft magnetic|advanced material|new material/i.test(p)) return "Special / SBQ";
+      // Service Centers / Distribution
+      if (/service center|distribution|trading/i.test(p)) return "Service Centers";
+      // Welding
+      if (/welding|filler metal|resistance wire|electrode/i.test(p)) return "Other — Welding & Wire";
+      // Misc processing & equipment
+      if (/valve|flange|fitting|bend|equipment|machinery|casting|automotive component|heavy equipment|precision component|wear part|solar|lightning|medical|optical|concrete pump|saw blade|hydraulic|earthing|agricultural/i.test(p)) return "Other — Products & Equipment";
+      return "Other";
+    };
+
+    const groupMap = {};
+    allProducts.forEach(p => {
+      const cat = catOf(p);
+      if (!groupMap[cat]) groupMap[cat] = [];
+      groupMap[cat].push(p);
+    });
+
+    const groupOrder = [
+      { label: "Flats", color: COLORS.Flats },
+      { label: "Longs", color: COLORS.Longs },
+      { label: "Heavy Plates", color: COLORS["Heavy Plates"] || "#4338ca" },
+      { label: "Stainless", color: COLORS.Stainless },
+      { label: "Pipes / Tubes", color: COLORS["Pipes / Tubes"] },
+      { label: "Special / SBQ", color: COLORS["Special / SBQ"] },
+      { label: "Semis / DRI", color: "#6b7280" },
+      { label: "Service Centers", color: COLORS["Service Centers"] || "#6b7280" },
+      { label: "Other — Welding & Wire", color: "#78716c" },
+      { label: "Other — Products & Equipment", color: "#94a3b8" },
+      { label: "Other", color: "#a3a3a3" },
     ];
-    const assigned = new Set();
-    const result = groups.map(g => {
-      const items = allProducts.filter(p => {
-        const st = productTypes[p];
-        if (!st) return false;
-        return g.types.some(t => st.has(t));
-      }).filter(p => !assigned.has(p));
-      items.forEach(p => assigned.add(p));
-      return { label: g.label, color: g.color, items: items.sort() };
-    }).filter(g => g.items.length > 0);
-    // Add "Other" group for unassigned
-    const other = allProducts.filter(p => !assigned.has(p)).sort();
-    if (other.length) result.push({ label: "Other", color: "#94a3b8", items: other });
-    return result;
+
+    return groupOrder
+      .filter(g => groupMap[g.label]?.length > 0)
+      .map(g => ({ label: g.label, color: g.color, items: groupMap[g.label].sort() }));
   }, [allProducts]);
 
   const filtered = useMemo(() => {
