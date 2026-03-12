@@ -1,8 +1,6 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
-// [id, plant, owner, country, region, simpleType, steelType, productsStr,
-//  ftaStatus, ftaName, effectiveTariff, mfnRef, specialDuty]
 import RAW from "./data.json";
 
 const MILLS = RAW.map(r => ({
@@ -37,6 +35,19 @@ const countBy = (arr, key) => {
   return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value }));
 };
 
+/* ─── Responsive hook ─── */
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const h = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
+  return isMobile;
+};
+
+/* ─── Components ─── */
+
 const Badge = ({ text, color, onRemove }) => (
   <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: color || "#e0e7ff", color: "#1e3a5f", borderRadius: 12, padding: "2px 10px", fontSize: 12, fontWeight: 500, margin: 2, whiteSpace: "nowrap" }}>
     {text}
@@ -50,27 +61,38 @@ const Dropdown = ({ label, options, selected, onChange, grouped }) => {
     ? grouped.map(g => ({ ...g, items: g.items.filter(o => !selected.includes(o)) })).filter(g => g.items.length > 0)
     : null;
   const flatFiltered = grouped ? null : options.filter(o => !selected.includes(o));
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const h = (e) => {
+      if (!e.target.closest("[data-dropdown]")) setOpen(false);
+    };
+    document.addEventListener("click", h);
+    return () => document.removeEventListener("click", h);
+  }, [open]);
+
   return (
-    <div style={{ position: "relative", display: "inline-block" }}>
-      <button onClick={() => setOpen(!open)} style={{ background: selected.length ? "#dbeafe" : "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#334155", display: "flex", alignItems: "center", gap: 4 }}>
+    <div style={{ position: "relative", display: "inline-block" }} data-dropdown>
+      <button onClick={() => setOpen(!open)} style={{ background: selected.length ? "#dbeafe" : "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#334155", display: "flex", alignItems: "center", gap: 4, minHeight: 36 }}>
         {label} {selected.length > 0 && <span style={{ background: "#2563eb", color: "#fff", borderRadius: 10, padding: "0 6px", fontSize: 11 }}>{selected.length}</span>}
-        <span style={{ fontSize: 10 }}>▼</span>
+        <span style={{ fontSize: 10 }}>{open ? "\u25B2" : "\u25BC"}</span>
       </button>
       {open && (
-        <div style={{ position: "absolute", top: "100%", left: 0, zIndex: 999, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,.12)", maxHeight: 340, overflowY: "auto", minWidth: 260, marginTop: 4 }}>
-          {selected.length > 0 && <div onClick={() => { onChange([]); setOpen(false); }} style={{ padding: "8px 12px", cursor: "pointer", color: "#dc2626", fontSize: 12, borderBottom: "1px solid #f1f5f9" }}>Clear all</div>}
+        <div style={{ position: "absolute", top: "100%", left: 0, zIndex: 999, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,.15)", maxHeight: 340, overflowY: "auto", minWidth: 260, marginTop: 4, WebkitOverflowScrolling: "touch" }}>
+          {selected.length > 0 && <div onClick={() => { onChange([]); setOpen(false); }} style={{ padding: "10px 12px", cursor: "pointer", color: "#dc2626", fontSize: 13, borderBottom: "1px solid #f1f5f9", fontWeight: 500 }}>Clear all</div>}
           {grouped ? filtered.map(g => (
             <div key={g.label}>
-              <div style={{ padding: "6px 12px", fontSize: 11, fontWeight: 700, color: "#fff", background: g.color || "#475569", position: "sticky", top: 0 }}>{g.label}</div>
+              <div style={{ padding: "8px 12px", fontSize: 11, fontWeight: 700, color: "#fff", background: g.color || "#475569", position: "sticky", top: 0, zIndex: 1 }}>{g.label}</div>
               {g.items.map(o => (
-                <div key={o} onClick={() => { onChange([...selected, o]); }} style={{ padding: "6px 12px 6px 20px", cursor: "pointer", fontSize: 12, borderBottom: "1px solid #f8fafc" }}
+                <div key={o} onClick={() => { onChange([...selected, o]); }} style={{ padding: "8px 12px 8px 20px", cursor: "pointer", fontSize: 13, borderBottom: "1px solid #f8fafc" }}
                   onMouseEnter={e => e.target.style.background = "#f1f5f9"} onMouseLeave={e => e.target.style.background = "transparent"}>
                   {o}
                 </div>
               ))}
             </div>
           )) : flatFiltered.map(o => (
-            <div key={o} onClick={() => { onChange([...selected, o]); }} style={{ padding: "7px 12px", cursor: "pointer", fontSize: 13, borderBottom: "1px solid #f8fafc" }}
+            <div key={o} onClick={() => { onChange([...selected, o]); }} style={{ padding: "9px 12px", cursor: "pointer", fontSize: 13, borderBottom: "1px solid #f8fafc" }}
               onMouseEnter={e => e.target.style.background = "#f1f5f9"} onMouseLeave={e => e.target.style.background = "transparent"}>
               {o}
             </div>
@@ -81,11 +103,11 @@ const Dropdown = ({ label, options, selected, onChange, grouped }) => {
   );
 };
 
-const KPI = ({ value, label, sub, color }) => (
-  <div style={{ background: "#fff", borderRadius: 12, padding: "16px 20px", boxShadow: "0 1px 3px rgba(0,0,0,.08)", borderTop: `3px solid ${color || "#2563eb"}`, minWidth: 120, flex: 1 }}>
-    <div style={{ fontSize: 28, fontWeight: 700, color: color || "#1e3a5f", lineHeight: 1.1 }}>{typeof value === "number" ? value.toLocaleString() : value}</div>
-    <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{label}</div>
-    {sub && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{sub}</div>}
+const KPI = ({ value, label, sub, color, compact }) => (
+  <div style={{ background: "#fff", borderRadius: 12, padding: compact ? "10px 14px" : "16px 20px", boxShadow: "0 1px 3px rgba(0,0,0,.08)", borderTop: `3px solid ${color || "#2563eb"}`, minWidth: compact ? 90 : 120, flex: 1 }}>
+    <div style={{ fontSize: compact ? 20 : 28, fontWeight: 700, color: color || "#1e3a5f", lineHeight: 1.1 }}>{typeof value === "number" ? value.toLocaleString() : value}</div>
+    <div style={{ fontSize: compact ? 10 : 12, color: "#64748b", marginTop: compact ? 2 : 4 }}>{label}</div>
+    {sub && <div style={{ fontSize: compact ? 9 : 11, color: "#94a3b8", marginTop: 2 }}>{sub}</div>}
   </div>
 );
 
@@ -105,8 +127,26 @@ const TariffBadge = ({ tariff }) => {
   return <span style={{ background: bg, color: fg, borderRadius: 10, padding: "1px 8px", fontSize: 10, fontWeight: 600 }}>{tariff}</span>;
 };
 
-const DataTable = ({ data, page, setPage, sortCol, sortDir, onSort }) => {
-  const pageSize = 20;
+/* ─── Mobile Card View ─── */
+const MillCard = ({ m }) => (
+  <div style={{ background: "#fff", borderRadius: 10, padding: 14, marginBottom: 8, boxShadow: "0 1px 3px rgba(0,0,0,.06)", borderLeft: `4px solid ${COLORS[m.simpleType] || "#6b7280"}` }}>
+    <div style={{ fontWeight: 600, fontSize: 14, color: "#1e3a5f", marginBottom: 4 }}>{m.plant}</div>
+    <div style={{ fontSize: 12, color: "#475569", marginBottom: 6 }}>{m.owner}</div>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
+      <span style={{ background: REGION_COLORS[m.region] || "#6b7280", color: "#fff", borderRadius: 10, padding: "1px 8px", fontSize: 10 }}>{m.country}</span>
+      <span style={{ background: COLORS[m.simpleType] || "#6b7280", color: "#fff", borderRadius: 10, padding: "1px 8px", fontSize: 10 }}>{m.steelType}</span>
+      <FTABadge status={m.ftaStatus} />
+      <TariffBadge tariff={m.effectiveTariff} />
+    </div>
+    <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.4, marginBottom: 4 }}>{m.products.join(", ")}</div>
+    {m.ftaName && <div style={{ fontSize: 10, color: "#475569" }}>Agreement: {m.ftaName}</div>}
+    {m.specialDuty !== "None" && <div style={{ fontSize: 10, color: "#dc2626", marginTop: 2 }}>{m.specialDuty}</div>}
+  </div>
+);
+
+/* ─── Data Table (desktop) ─── */
+const DataTable = ({ data, page, setPage, sortCol, sortDir, onSort, isMobile }) => {
+  const pageSize = isMobile ? 10 : 20;
   const cols = [
     { key: "id", label: "ID", w: 80 },
     { key: "plant", label: "Plant", w: 220 },
@@ -137,11 +177,36 @@ const DataTable = ({ data, page, setPage, sortCol, sortDir, onSort }) => {
   const tdStyle = { padding: "6px 10px", fontSize: 12, borderBottom: "1px solid #f1f5f9", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
   const arrow = (key) => sortCol === key ? (sortDir === "asc" ? " \u25B2" : " \u25BC") : " \u25BD";
   const pgBtn = (disabled, onClick, label) => (
-    <button disabled={disabled} onClick={onClick} style={{ padding: "4px 10px", fontSize: 12, borderRadius: 4, border: "1px solid #e2e8f0", background: disabled ? "#f8fafc" : "#fff", cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.4 : 1, fontWeight: 500 }}>{label}</button>
+    <button disabled={disabled} onClick={onClick} style={{ padding: "6px 12px", fontSize: 12, borderRadius: 6, border: "1px solid #e2e8f0", background: disabled ? "#f8fafc" : "#fff", cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.4 : 1, fontWeight: 500, minHeight: 34 }}>{label}</button>
   );
+
+  const pagination = (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, padding: "0 4px", flexWrap: "wrap", gap: 8 }}>
+      <span style={{ fontSize: 12, color: "#64748b" }}>
+        <strong>{sorted.length > 0 ? page * pageSize + 1 : 0}</strong>-<strong>{Math.min((page + 1) * pageSize, sorted.length)}</strong> of <strong>{sorted.length.toLocaleString()}</strong>
+      </span>
+      <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+        {pgBtn(page === 0, () => setPage(0), "\u00AB")}
+        {pgBtn(page === 0, () => setPage(p => p - 1), "\u2039")}
+        <span style={{ padding: "4px 8px", fontSize: 12, fontWeight: 500, color: "#1e3a5f" }}>{page + 1}/{totalPages || 1}</span>
+        {pgBtn(page >= totalPages - 1, () => setPage(p => p + 1), "\u203A")}
+        {pgBtn(page >= totalPages - 1, () => setPage(totalPages - 1), "\u00BB")}
+      </div>
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <div>
+        {slice.map((m, i) => <MillCard key={m.id + i} m={m} />)}
+        {pagination}
+      </div>
+    );
+  }
+
   return (
     <div>
-      <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+      <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid #e2e8f0", WebkitOverflowScrolling: "touch" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
           <colgroup>{cols.map(c => <col key={c.key} style={{ width: c.w }} />)}</colgroup>
           <thead>
@@ -166,7 +231,7 @@ const DataTable = ({ data, page, setPage, sortCol, sortDir, onSort }) => {
                 <td style={tdStyle}><span style={{ background: COLORS[m.simpleType] || "#6b7280", color: "#fff", borderRadius: 10, padding: "1px 8px", fontSize: 11, whiteSpace: "nowrap" }}>{m.steelType}</span></td>
                 <td style={{ ...tdStyle, color: "#475569" }}>{m.products.join(", ")}</td>
                 <td style={tdStyle}><FTABadge status={m.ftaStatus} /></td>
-                <td style={{ ...tdStyle, fontSize: 11, color: "#475569" }}>{m.ftaName || "—"}</td>
+                <td style={{ ...tdStyle, fontSize: 11, color: "#475569" }}>{m.ftaName || "\u2014"}</td>
                 <td style={tdStyle}><TariffBadge tariff={m.effectiveTariff} /></td>
                 <td style={{ ...tdStyle, fontSize: 11, color: m.specialDuty !== "None" ? "#dc2626" : "#94a3b8" }}>{m.specialDuty}</td>
               </tr>
@@ -174,18 +239,7 @@ const DataTable = ({ data, page, setPage, sortCol, sortDir, onSort }) => {
           </tbody>
         </table>
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, padding: "0 4px" }}>
-        <span style={{ fontSize: 12, color: "#64748b" }}>
-          Showing <strong>{sorted.length > 0 ? page * pageSize + 1 : 0}</strong>-<strong>{Math.min((page + 1) * pageSize, sorted.length)}</strong> of <strong>{sorted.length.toLocaleString()}</strong> mills
-        </span>
-        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-          {pgBtn(page === 0, () => setPage(0), "\u00AB")}
-          {pgBtn(page === 0, () => setPage(p => p - 1), "\u2039 Prev")}
-          <span style={{ padding: "4px 10px", fontSize: 12, fontWeight: 500, color: "#1e3a5f" }}>Page {page + 1} / {totalPages || 1}</span>
-          {pgBtn(page >= totalPages - 1, () => setPage(p => p + 1), "Next \u203A")}
-          {pgBtn(page >= totalPages - 1, () => setPage(totalPages - 1), "\u00BB")}
-        </div>
-      </div>
+      {pagination}
     </div>
   );
 };
@@ -220,7 +274,7 @@ const exportCSV = (data) => {
 
 const ChartCard = ({ title, children, style: s, headerRight }) => (
   <div style={{ background: "#fff", borderRadius: 12, padding: 20, boxShadow: "0 1px 3px rgba(0,0,0,.08)", ...s }}>
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
       <div style={{ fontSize: 14, fontWeight: 600, color: "#1e3a5f" }}>{title}</div>
       {headerRight}
     </div>
@@ -228,12 +282,14 @@ const ChartCard = ({ title, children, style: s, headerRight }) => (
   </div>
 );
 
-const SearchBox = ({ value, onChange }) => (
+const SearchBox = ({ value, onChange, isMobile }) => (
   <input type="text" placeholder="Search mills, owners, products..." value={value} onChange={e => onChange(e.target.value)}
-    style={{ width: 260, padding: "8px 14px", border: "1px solid #cbd5e1", borderRadius: 8, fontSize: 13, outline: "none", background: "#fff" }} />
+    style={{ width: isMobile ? "100%" : 260, padding: "8px 14px", border: "1px solid #cbd5e1", borderRadius: 8, fontSize: 13, outline: "none", background: "#fff", minHeight: 36 }} />
 );
 
+/* ─── Main Dashboard ─── */
 export default function Dashboard() {
+  const isMobile = useIsMobile();
   const [filterRegion, setFilterRegion] = useState([]);
   const [filterCountry, setFilterCountry] = useState([]);
   const [filterType, setFilterType] = useState([]);
@@ -244,6 +300,9 @@ export default function Dashboard() {
   const [page, setPage] = useState(0);
   const [sortCol, setSortCol] = useState(null);
   const [sortDir, setSortDir] = useState("asc");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const pad = isMobile ? 12 : 28;
 
   const allRegions = useMemo(() => [...new Set(MILLS.map(m => m.region))].sort(), []);
   const allCountries = useMemo(() => [...new Set(MILLS.map(m => m.country))].sort(), []);
@@ -260,45 +319,29 @@ export default function Dashboard() {
     return Object.entries(pc).sort((a, b) => a[0].localeCompare(b[0])).map(([p]) => p);
   }, []);
 
-  // Hardcoded product-to-category mapping based on steel industry classification
+  // Hardcoded product-to-category mapping
   const groupedProducts = useMemo(() => {
     const catOf = (p) => {
       const pl = p.toLowerCase();
-      // Stainless first (most specific)
       if (pl.startsWith("stainless") || /specialty stainless/i.test(p)) return "Stainless";
-      // Pipes / Tubes
       if (/pipe|tube|octg|hollow section|hss|hsaw|lsaw|cdw|drill pipe|ductile iron/i.test(p)) return "Pipes / Tubes";
-      // Heavy Plates (before Flats so plates don't get caught)
       if (/^Plates$|heavy plate|medium.*plate|quarto plate|quenched.*tempered plate|cut-to-length plate|coil plate|plate.*tmcp|structural steel plate|specialty plate|wear-resistant plate|steel plate|pipe plate|tool steel plate/i.test(p)) return "Heavy Plates";
-      // Longs
       if (/\bh-beam|beam|wide flange|wire rod|rebar|rebars|tmt bar|section|heavy section|structural.*shape|structural.*section|structural beam|structural steel$|channel|angle|rail|sheet pile|merchant bar|profile|roll-formed|shape|rod\b/i.test(p)
         && !/flat/i.test(p) && !/strip/i.test(p) && !/sheet(?!.*pile)/i.test(p)) return "Longs";
       if (/^(Bars|Round Bars|Rounds|Bright Bars|Cold Finished Bars|Engineered Bars|Bars-in-Coil|Calibrated Bars|Squares|Flats|Mesh|Wire Mesh|Wire|Wire Forms|Wire Products|Copper-Coated Wire|Fine Wire|Specialty Wire|Specialty Wire Components|Bolts|Fasteners|Threaded Products|Forgings|Rings|Shafts|Spring|Spring Steel|Grinding Bars)$/i.test(p)) return "Longs";
-      // Flats
       if (/\bhrc\b|crc\b|hdg\b|ppgi|ppga|tinplate|eccs|tfs|galvanized steel|color coated|coated product|aluminized|aluzinc|pre-coated|electrical steel|flat product|sheet(?!.*pile)|coil(?!.*plate)|strip(?!.*stainless)|narrow strip|hot-rolled strip|cold-rolled strip|hr narrow|packaging$|blanking|compact coil|automotive steel sheet|steel strapping|high-strength steel|automotive steel$|coin blank/i.test(p)) return "Flats";
       if (/^(Coils|Sheets|Strip|Strip Steel|Alloy Strip|Bimetal Strip|Precision Strip|Precision Strips|Specialty Strip|Specialty Alloy Strip|CR Coils|Coil|Flat Products \(Distribution\)|Flat Products \(Processing\)|Flat Products \(Trading\)|CRC \(Distribution\)|HDG \(Electro-Galvanized\)|HDG \(Processing\)|PPGI \(Processing\)|Packaging Materials|Clad Steel|Shutters|NOES\)|Electrical Steel \(GOES|Electrical Steel \(GOES\))$/i.test(p)) return "Flats";
-      // Semis / DRI
       if (/\bslab|billet|bloom|dri\b|hbi\b|pig iron|nickel pig iron|ferro alloy|ingot|forged ingot|steel.*titanium slag/i.test(p)) return "Semis / DRI";
-      // Special / SBQ
       if (/\bsbq\b|tool steel|bearing steel|die steel|high-speed steel|special steel|specialty steel|alloy steel|engineering steel|case hardening|through hardening|esr.*var|special bar|specialty bar|rock drill/i.test(p)) return "Special / SBQ";
       if (/alloy bar|specialty alloy bar|cast iron bar|precision ground bar|bright steel/i.test(p)) return "Special / SBQ";
       if (/superalloy|hastelloy|inconel|monel|titanium|nickel alloy|special alloy|specialty alloy(?!.*strip)|high-temperature alloy|heat-resistant alloy|amorphous|soft magnetic|advanced material|new material/i.test(p)) return "Special / SBQ";
-      // Service Centers / Distribution
       if (/service center|distribution|trading/i.test(p)) return "Service Centers";
-      // Welding
-      if (/welding|filler metal|resistance wire|electrode/i.test(p)) return "Other — Welding & Wire";
-      // Misc processing & equipment
-      if (/valve|flange|fitting|bend|equipment|machinery|casting|automotive component|heavy equipment|precision component|wear part|solar|lightning|medical|optical|concrete pump|saw blade|hydraulic|earthing|agricultural/i.test(p)) return "Other — Products & Equipment";
+      if (/welding|filler metal|resistance wire|electrode/i.test(p)) return "Other \u2014 Welding & Wire";
+      if (/valve|flange|fitting|bend|equipment|machinery|casting|automotive component|heavy equipment|precision component|wear part|solar|lightning|medical|optical|concrete pump|saw blade|hydraulic|earthing|agricultural/i.test(p)) return "Other \u2014 Products & Equipment";
       return "Other";
     };
-
     const groupMap = {};
-    allProducts.forEach(p => {
-      const cat = catOf(p);
-      if (!groupMap[cat]) groupMap[cat] = [];
-      groupMap[cat].push(p);
-    });
-
+    allProducts.forEach(p => { const cat = catOf(p); if (!groupMap[cat]) groupMap[cat] = []; groupMap[cat].push(p); });
     const groupOrder = [
       { label: "Flats", color: COLORS.Flats },
       { label: "Longs", color: COLORS.Longs },
@@ -308,14 +351,11 @@ export default function Dashboard() {
       { label: "Special / SBQ", color: COLORS["Special / SBQ"] },
       { label: "Semis / DRI", color: "#6b7280" },
       { label: "Service Centers", color: COLORS["Service Centers"] || "#6b7280" },
-      { label: "Other — Welding & Wire", color: "#78716c" },
-      { label: "Other — Products & Equipment", color: "#94a3b8" },
+      { label: "Other \u2014 Welding & Wire", color: "#78716c" },
+      { label: "Other \u2014 Products & Equipment", color: "#94a3b8" },
       { label: "Other", color: "#a3a3a3" },
     ];
-
-    return groupOrder
-      .filter(g => groupMap[g.label]?.length > 0)
-      .map(g => ({ label: g.label, color: g.color, items: groupMap[g.label].sort() }));
+    return groupOrder.filter(g => groupMap[g.label]?.length > 0).map(g => ({ label: g.label, color: g.color, items: groupMap[g.label].sort() }));
   }, [allProducts]);
 
   const filtered = useMemo(() => {
@@ -346,21 +386,18 @@ export default function Dashboard() {
   const ownerData = useMemo(() => countBy(filtered, "owner").slice(0, 10), [filtered]);
   const uniqueCountries = useMemo(() => new Set(filtered.map(m => m.country)).size, [filtered]);
 
-  // Trade intelligence data
   const ftaData = useMemo(() => countBy(filtered, "ftaStatus"), [filtered]);
   const ftaYes = ftaData.find(d => d.name === "Yes")?.value || 0;
   const ftaNo = ftaData.find(d => d.name === "No")?.value || 0;
   const ftaDomestic = ftaData.find(d => d.name === "Domestic")?.value || 0;
   const withDuties = useMemo(() => filtered.filter(m => m.specialDuty !== "None").length, [filtered]);
 
-  // FTA by agreement name
   const ftaAgreementData = useMemo(() => {
     const m = {};
     filtered.filter(x => x.ftaStatus === "Yes").forEach(x => { const name = x.ftaName || "Other"; m[name] = (m[name] || 0) + 1; });
     return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value }));
   }, [filtered]);
 
-  // Tariff distribution for non-FTA countries
   const tariffDistro = useMemo(() => {
     const bins = { "0% (FTA)": 0, "10%": 0, "20%": 0, "25%": 0, "25-35%": 0, "35%": 0, "35-50%": 0, "50%": 0, "N/A": 0 };
     filtered.forEach(m => {
@@ -368,19 +405,13 @@ export default function Dashboard() {
       if (t.startsWith("0%")) bins["0% (FTA)"]++;
       else if (bins[t] !== undefined) bins[t]++;
       else if (t === "N/A") bins["N/A"]++;
-      else {
-        const num = parseInt(t);
-        if (num <= 10) bins["10%"]++;
-        else if (num <= 20) bins["20%"]++;
-        else if (num <= 25) bins["25%"]++;
-        else if (num <= 35) bins["35%"]++;
-        else bins["50%"]++;
-      }
+      else { const num = parseInt(t); if (num <= 10) bins["10%"]++; else if (num <= 20) bins["20%"]++; else if (num <= 25) bins["25%"]++; else if (num <= 35) bins["35%"]++; else bins["50%"]++; }
     });
     return Object.entries(bins).filter(([_, v]) => v > 0).map(([name, value]) => ({ name, value }));
   }, [filtered]);
 
   const hasFilters = filterRegion.length || filterCountry.length || filterType.length || filterProduct.length || filterOwner.length || filterFTA.length || search;
+  const activeFilterCount = filterRegion.length + filterCountry.length + filterType.length + filterProduct.length + filterOwner.length + filterFTA.length + (search ? 1 : 0);
 
   const clearAll = () => {
     setFilterRegion([]); setFilterCountry([]); setFilterType([]);
@@ -396,43 +427,68 @@ export default function Dashboard() {
 
   const TARIFF_COLORS = { "0% (FTA)": "#16a34a", "10%": "#84cc16", "20%": "#eab308", "25%": "#f59e0b", "25-35%": "#ea580c", "35%": "#dc2626", "35-50%": "#b91c1c", "50%": "#7f1d1d", "N/A": "#94a3b8" };
 
+  const pieRadius = isMobile ? 65 : 85;
+  const pieInner = isMobile ? 35 : 45;
+
   return (
     <div style={{ fontFamily: "'Inter', -apple-system, sans-serif", background: "#f1f5f9", minHeight: "100vh", padding: 0 }}>
       {/* Header */}
-      <div style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)", padding: "20px 28px", color: "#fff" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5 }}>Global Steel Mills Dashboard</div>
-            <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 2 }}>Siderurgical Catalog — Trade Intelligence & Interactive Analysis</div>
+      <div style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)", padding: isMobile ? "14px 12px" : "20px 28px", color: "#fff" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: isMobile ? 16 : 22, fontWeight: 700, letterSpacing: -0.5 }}>Steel Mills Dashboard</div>
+            {!isMobile && <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 2 }}>Siderurgical Catalog — Trade Intelligence & Interactive Analysis</div>}
           </div>
-          <div style={{ fontSize: 13, color: "#94a3b8", textAlign: "right" }}>
-            <span style={{ color: "#60a5fa", fontWeight: 600, fontSize: 20 }}>{filtered.length.toLocaleString()}</span>
-            <span style={{ marginLeft: 4 }}>mills shown</span>
+          <div style={{ fontSize: 13, color: "#94a3b8", textAlign: "right", flexShrink: 0 }}>
+            <span style={{ color: "#60a5fa", fontWeight: 600, fontSize: isMobile ? 16 : 20 }}>{filtered.length.toLocaleString()}</span>
+            <span style={{ marginLeft: 4, fontSize: isMobile ? 11 : 13 }}>mills</span>
           </div>
         </div>
       </div>
 
       {/* Filter Bar */}
-      <div style={{ background: "#fff", padding: "10px 28px", borderBottom: "1px solid #e2e8f0", display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-        <SearchBox value={search} onChange={v => { setSearch(v); resetPage(); }} />
-        <div style={{ width: 1, height: 28, background: "#e2e8f0" }} />
-        <Dropdown label="Region" options={allRegions} selected={filterRegion} onChange={setRegion} />
-        <Dropdown label="Country" options={allCountries} selected={filterCountry} onChange={setCountry} />
-        <Dropdown label="Steel Type" options={allTypes} selected={filterType} onChange={setType} />
-        <Dropdown label="Product" options={allProducts} selected={filterProduct} onChange={setProduct} grouped={groupedProducts} />
-        <Dropdown label="Owner" options={allOwners} selected={filterOwner} onChange={setOwner} />
-        <div style={{ width: 1, height: 28, background: "#e2e8f0" }} />
-        <Dropdown label="FTA Status" options={allFTA} selected={filterFTA} onChange={setFTA} />
-        {hasFilters && (
-          <button onClick={clearAll} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #fecaca", background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontSize: 12, fontWeight: 500 }}>
-            Clear All
-          </button>
+      <div style={{ background: "#fff", padding: `10px ${pad}px`, borderBottom: "1px solid #e2e8f0" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          <SearchBox value={search} onChange={v => { setSearch(v); resetPage(); }} isMobile={isMobile} />
+          {isMobile ? (
+            <button onClick={() => setFiltersOpen(!filtersOpen)} style={{ background: filtersOpen ? "#dbeafe" : "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#334155", display: "flex", alignItems: "center", gap: 4, minHeight: 36 }}>
+              Filters {activeFilterCount > 0 && <span style={{ background: "#2563eb", color: "#fff", borderRadius: 10, padding: "0 6px", fontSize: 11 }}>{activeFilterCount}</span>}
+              <span style={{ fontSize: 10 }}>{filtersOpen ? "\u25B2" : "\u25BC"}</span>
+            </button>
+          ) : (
+            <>
+              <div style={{ width: 1, height: 28, background: "#e2e8f0" }} />
+              <Dropdown label="Region" options={allRegions} selected={filterRegion} onChange={setRegion} />
+              <Dropdown label="Country" options={allCountries} selected={filterCountry} onChange={setCountry} />
+              <Dropdown label="Steel Type" options={allTypes} selected={filterType} onChange={setType} />
+              <Dropdown label="Product" options={allProducts} selected={filterProduct} onChange={setProduct} grouped={groupedProducts} />
+              <Dropdown label="Owner" options={allOwners} selected={filterOwner} onChange={setOwner} />
+              <div style={{ width: 1, height: 28, background: "#e2e8f0" }} />
+              <Dropdown label="FTA Status" options={allFTA} selected={filterFTA} onChange={setFTA} />
+            </>
+          )}
+          {hasFilters && (
+            <button onClick={clearAll} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #fecaca", background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontSize: 12, fontWeight: 500, minHeight: 34 }}>
+              Clear All
+            </button>
+          )}
+        </div>
+        {/* Mobile filters expanded */}
+        {isMobile && filtersOpen && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8, paddingTop: 8, borderTop: "1px solid #f1f5f9" }}>
+            <Dropdown label="Region" options={allRegions} selected={filterRegion} onChange={setRegion} />
+            <Dropdown label="Country" options={allCountries} selected={filterCountry} onChange={setCountry} />
+            <Dropdown label="Steel Type" options={allTypes} selected={filterType} onChange={setType} />
+            <Dropdown label="Product" options={allProducts} selected={filterProduct} onChange={setProduct} grouped={groupedProducts} />
+            <Dropdown label="Owner" options={allOwners} selected={filterOwner} onChange={setOwner} />
+            <Dropdown label="FTA Status" options={allFTA} selected={filterFTA} onChange={setFTA} />
+          </div>
         )}
       </div>
 
       {/* Active Filters */}
       {hasFilters && (
-        <div style={{ padding: "6px 28px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center" }}>
+        <div style={{ padding: `6px ${pad}px`, background: "#f8fafc", borderBottom: "1px solid #e2e8f0", display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center" }}>
           <span style={{ fontSize: 11, color: "#64748b", marginRight: 4 }}>Active:</span>
           {filterRegion.map(f => <Badge key={f} text={f} color="#dbeafe" onRemove={() => setRegion(filterRegion.filter(x => x !== f))} />)}
           {filterCountry.map(f => <Badge key={f} text={f} color="#dcfce7" onRemove={() => setCountry(filterCountry.filter(x => x !== f))} />)}
@@ -445,41 +501,41 @@ export default function Dashboard() {
       )}
 
       {/* Content */}
-      <div style={{ padding: "16px 28px" }}>
+      <div style={{ padding: `16px ${pad}px` }}>
         {/* KPIs Row 1 */}
-        <div style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
-          <KPI value={filtered.length} label="Total Mills" sub={hasFilters ? `of ${MILLS.length.toLocaleString()} total` : null} color="#2563eb" />
-          <KPI value={uniqueCountries} label="Countries" color="#7c3aed" />
-          <KPI value={typeData.find(d => d.name === "Flats")?.value || 0} label="Flat Products" color={COLORS.Flats} />
-          <KPI value={typeData.find(d => d.name === "Longs")?.value || 0} label="Long Products" color={COLORS.Longs} />
-          <KPI value={typeData.find(d => d.name === "Stainless")?.value || 0} label="Stainless" color={COLORS.Stainless} />
-          <KPI value={typeData.find(d => d.name === "Pipes / Tubes")?.value || 0} label="Pipes / Tubes" color={COLORS["Pipes / Tubes"]} />
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(6, 1fr)", gap: isMobile ? 6 : 12, marginBottom: isMobile ? 6 : 12 }}>
+          <KPI value={filtered.length} label="Total Mills" sub={hasFilters ? `of ${MILLS.length.toLocaleString()}` : null} color="#2563eb" compact={isMobile} />
+          <KPI value={uniqueCountries} label="Countries" color="#7c3aed" compact={isMobile} />
+          <KPI value={typeData.find(d => d.name === "Flats")?.value || 0} label="Flats" color={COLORS.Flats} compact={isMobile} />
+          <KPI value={typeData.find(d => d.name === "Longs")?.value || 0} label="Longs" color={COLORS.Longs} compact={isMobile} />
+          <KPI value={typeData.find(d => d.name === "Stainless")?.value || 0} label="Stainless" color={COLORS.Stainless} compact={isMobile} />
+          <KPI value={typeData.find(d => d.name === "Pipes / Tubes")?.value || 0} label="Pipes" color={COLORS["Pipes / Tubes"]} compact={isMobile} />
         </div>
 
-        {/* KPIs Row 2 - Trade Intelligence */}
-        <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-          <KPI value={ftaYes} label="FTA Partners" sub={`${((ftaYes / filtered.length) * 100).toFixed(0)}% of shown`} color="#16a34a" />
-          <KPI value={ftaNo} label="No FTA" sub={`Subject to MFN tariffs`} color="#dc2626" />
-          <KPI value={ftaDomestic} label="Domestic" sub="Mexican mills" color="#2563eb" />
-          <KPI value={withDuties} label="Special Duties" sub="AD / CVD active or monitoring" color="#d97706" />
-          <KPI value="25-50%" label="MFN Tariff Range" sub="Non-FTA steel (2026 reform)" color="#ea580c" />
-          <KPI value="0%" label="FTA Tariff Rate" sub="Preferential access" color="#16a34a" />
+        {/* KPIs Row 2 - Trade */}
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(6, 1fr)", gap: isMobile ? 6 : 12, marginBottom: 16 }}>
+          <KPI value={ftaYes} label="FTA Partners" sub={`${((ftaYes / filtered.length) * 100).toFixed(0)}%`} color="#16a34a" compact={isMobile} />
+          <KPI value={ftaNo} label="No FTA" sub="MFN tariffs" color="#dc2626" compact={isMobile} />
+          <KPI value={ftaDomestic} label="Domestic" sub="Mexico" color="#2563eb" compact={isMobile} />
+          <KPI value={withDuties} label="A/D Duties" sub="Active cases" color="#d97706" compact={isMobile} />
+          <KPI value="25-50%" label="MFN Range" sub="Non-FTA" color="#ea580c" compact={isMobile} />
+          <KPI value="0%" label="FTA Rate" sub="Preferential" color="#16a34a" compact={isMobile} />
         </div>
 
         {/* Charts Grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? 12 : 16 }}>
           {/* Steel Type Pie */}
           <ChartCard title="Steel Type Distribution">
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <ResponsiveContainer width="55%" height={220}>
+            <div style={{ display: "flex", alignItems: "center", flexDirection: isMobile ? "column" : "row" }}>
+              <ResponsiveContainer width={isMobile ? "100%" : "55%"} height={isMobile ? 200 : 220}>
                 <PieChart>
-                  <Pie data={typeData} dataKey="value" cx="50%" cy="50%" outerRadius={85} innerRadius={45} paddingAngle={2}>
+                  <Pie data={typeData} dataKey="value" cx="50%" cy="50%" outerRadius={pieRadius} innerRadius={pieInner} paddingAngle={2}>
                     {typeData.map(d => <Cell key={d.name} fill={COLORS[d.name] || "#6b7280"} />)}
                   </Pie>
                   <Tooltip formatter={(v, n) => [`${v} mills (${((v / filtered.length) * 100).toFixed(1)}%)`, n]} />
                 </PieChart>
               </ResponsiveContainer>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, width: isMobile ? "100%" : "auto" }}>
                 {typeData.map(d => (
                   <div key={d.name} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "2px 4px", borderRadius: 4 }}
                     onClick={() => { if (filterType.includes(d.name)) setType(filterType.filter(x => x !== d.name)); else setType([...filterType, d.name]); }}>
@@ -494,16 +550,16 @@ export default function Dashboard() {
 
           {/* FTA Status Pie */}
           <ChartCard title="FTA Status with Mexico">
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <ResponsiveContainer width="55%" height={220}>
+            <div style={{ display: "flex", alignItems: "center", flexDirection: isMobile ? "column" : "row" }}>
+              <ResponsiveContainer width={isMobile ? "100%" : "55%"} height={isMobile ? 200 : 220}>
                 <PieChart>
-                  <Pie data={ftaData} dataKey="value" cx="50%" cy="50%" outerRadius={85} innerRadius={45} paddingAngle={2}>
+                  <Pie data={ftaData} dataKey="value" cx="50%" cy="50%" outerRadius={pieRadius} innerRadius={pieInner} paddingAngle={2}>
                     {ftaData.map(d => <Cell key={d.name} fill={FTA_COLORS[d.name] || "#6b7280"} />)}
                   </Pie>
                   <Tooltip formatter={(v, n) => [`${v} mills (${((v / filtered.length) * 100).toFixed(1)}%)`, n === "Yes" ? "Has FTA" : n === "No" ? "No FTA" : n]} />
                 </PieChart>
               </ResponsiveContainer>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, width: isMobile ? "100%" : "auto" }}>
                 {ftaData.map(d => (
                   <div key={d.name} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", padding: "2px 4px", borderRadius: 4 }}
                     onClick={() => { if (filterFTA.includes(d.name)) setFTA(filterFTA.filter(x => x !== d.name)); else setFTA([...filterFTA, d.name]); }}>
@@ -513,7 +569,7 @@ export default function Dashboard() {
                   </div>
                 ))}
                 <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, lineHeight: 1.3 }}>
-                  Mills from FTA countries enjoy 0% tariff on steel imports to Mexico
+                  FTA countries enjoy 0% tariff on steel imports to Mexico
                 </div>
               </div>
             </div>
@@ -521,10 +577,10 @@ export default function Dashboard() {
 
           {/* Region Bar */}
           <ChartCard title="Mills by Region">
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={regionData} layout="vertical" margin={{ left: 80, right: 20, top: 5, bottom: 5 }}>
+            <ResponsiveContainer width="100%" height={isMobile ? 200 : 220}>
+              <BarChart data={regionData} layout="vertical" margin={{ left: isMobile ? 60 : 80, right: 20, top: 5, bottom: 5 }}>
                 <XAxis type="number" tick={{ fontSize: 11 }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={80} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: isMobile ? 9 : 11 }} width={isMobile ? 60 : 80} />
                 <Tooltip formatter={(v) => [`${v} mills`, "Count"]} />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                   {regionData.map(d => <Cell key={d.name} fill={REGION_COLORS[d.name] || "#6b7280"} />)}
@@ -534,10 +590,10 @@ export default function Dashboard() {
           </ChartCard>
 
           {/* Tariff Distribution */}
-          <ChartCard title="Effective Tariff Distribution (Mexico Import)">
-            <ResponsiveContainer width="100%" height={220}>
+          <ChartCard title="Tariff Distribution (Mexico Import)">
+            <ResponsiveContainer width="100%" height={isMobile ? 200 : 220}>
               <BarChart data={tariffDistro} margin={{ left: 10, right: 20, top: 5, bottom: 30 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 10, angle: -15, textAnchor: "end" }} interval={0} height={50} />
+                <XAxis dataKey="name" tick={{ fontSize: isMobile ? 8 : 10, angle: -15, textAnchor: "end" }} interval={0} height={50} />
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(v) => [`${v} mills`, "Count"]} />
                 <Bar dataKey="value" radius={[4, 4, 0, 0]}>
@@ -552,7 +608,7 @@ export default function Dashboard() {
             <MiniBar data={countryData} color="#2563eb" />
           </ChartCard>
 
-          {/* FTA Agreements Breakdown */}
+          {/* FTA Agreements */}
           <ChartCard title="Mills by FTA Agreement">
             <MiniBar data={ftaAgreementData} color="#16a34a" />
           </ChartCard>
@@ -564,9 +620,9 @@ export default function Dashboard() {
 
           {/* Top Owners */}
           <ChartCard title="Top 10 Owners">
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={isMobile ? 200 : 220}>
               <BarChart data={ownerData} margin={{ left: 10, right: 20, top: 5, bottom: 40 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 9, angle: -25, textAnchor: "end" }} interval={0} height={60} />
+                <XAxis dataKey="name" tick={{ fontSize: isMobile ? 7 : 9, angle: -25, textAnchor: "end" }} interval={0} height={60} />
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(v) => [`${v} mills`, "Count"]} />
                 <Bar dataKey="value" fill="#7c3aed" radius={[4, 4, 0, 0]} />
@@ -576,35 +632,35 @@ export default function Dashboard() {
         </div>
 
         {/* Trade Intelligence Note */}
-        <div style={{ marginTop: 16, background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 12, padding: "14px 20px" }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#92400e", marginBottom: 6 }}>Trade Intelligence Notes — Pr&aacute;cticas Desleales (Dec 17, 2024) &amp; SE Catalog</div>
-          <div style={{ fontSize: 12, color: "#78350f", lineHeight: 1.6 }}>
-            <strong>Sources: SE Catalog of Approved Mills + Pr&aacute;cticas Desleales de Comercio Exterior (Dec 17, 2024).</strong>{" "}
-            FTA partners: <strong>T-MEC/USMCA</strong> (USA, Canada), <strong>TLCUEM</strong> (EU), <strong>CPTPP</strong> (Japan, Australia, etc.) enjoy <strong>0% preferential tariff</strong>.
-            Non-FTA countries face <strong>25-50% MFN tariffs</strong> under the 2026 LIGIE reform.{" "}
-            <strong>Active A/D cases (27 of 47):</strong>{" "}
-            Coated Flat Steel — China 22.26-76.33%, Vietnam 2.06-10.84%.{" "}
-            CRC — Russia 15%, Kazakhstan 22%, S. Korea quota system, Vietnam 11.64-79.24%.{" "}
-            Seamless Pipe — China US$1,569/ton, S. Korea US$0.13/kg, Spain US$1.87/kg, India US$0.21/kg, Ukraine US$0.17/kg.{" "}
-            Steel Beams — Germany US$0.11/kg, Spain US$0.06/kg, UK US$0.13/kg.{" "}
-            Stainless Flat — China US$0.63/kg, Taiwan US$0.05-0.61/kg.{" "}
-            Steel Nails — China 31%. Threaded Rod — China 8-91%. Welded Pipe — China US$0.36-0.62/kg.{" "}
-            Slab — Brazil/Russia under investigation. 20 cases eliminated/expired since 2020 (incl. HRC, Sheet Plate, Wire Rod, Rebar).
+        <div style={{ marginTop: 16, background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 12, padding: isMobile ? "10px 14px" : "14px 20px" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#92400e", marginBottom: 6 }}>Trade Intelligence Notes &mdash; Pr&aacute;cticas Desleales (Dec 17, 2024) &amp; SE Catalog</div>
+          <div style={{ fontSize: isMobile ? 11 : 12, color: "#78350f", lineHeight: 1.6 }}>
+            <strong>Sources: SE Catalog + Pr&aacute;cticas Desleales de Comercio Exterior (Dec 17, 2024).</strong>{" "}
+            FTA: <strong>T-MEC</strong> (USA/Canada), <strong>TLCUEM</strong> (EU), <strong>CPTPP</strong> (Japan, etc.) = <strong>0% tariff</strong>.
+            Non-FTA: <strong>25-50% MFN</strong> (2026 LIGIE reform).{" "}
+            <strong>Active A/D (27 of 47):</strong>{" "}
+            Coated &mdash; China 22-76%, Vietnam 2-11%.{" "}
+            CRC &mdash; Russia 15%, Kazakhstan 22%, S. Korea quota, Vietnam 12-79%.{" "}
+            Seamless Pipe &mdash; China $1,569/t, S. Korea $0.13/kg, Spain $1.87/kg, India $0.21/kg, Ukraine $0.17/kg.{" "}
+            Beams &mdash; Germany $0.11/kg, Spain $0.06/kg, UK $0.13/kg.{" "}
+            Stainless Flat &mdash; China $0.63/kg, Taiwan $0.05-0.61/kg.{" "}
+            Nails &mdash; China 31%. Threaded Rod &mdash; China 8-91%. Welded Pipe &mdash; China $0.36-0.62/kg.{" "}
+            Slab &mdash; Brazil/Russia under investigation.
           </div>
         </div>
 
         {/* Mills List */}
         <div style={{ marginTop: 16 }}>
-          <ChartCard title={`Mills List (${filtered.length.toLocaleString()} records)`}
+          <ChartCard title={`Mills List (${filtered.length.toLocaleString()})`}
             headerRight={
-              <button onClick={() => exportCSV(filtered)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 6, border: "1px solid #2563eb", background: "#eff6ff", color: "#2563eb", cursor: "pointer", fontSize: 12, fontWeight: 600, transition: "all 0.15s" }}
+              <button onClick={() => exportCSV(filtered)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 6, border: "1px solid #2563eb", background: "#eff6ff", color: "#2563eb", cursor: "pointer", fontSize: 12, fontWeight: 600, transition: "all 0.15s", minHeight: 34 }}
                 onMouseEnter={e => { e.currentTarget.style.background = "#2563eb"; e.currentTarget.style.color = "#fff"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.color = "#2563eb"; }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                Export CSV
+                {isMobile ? "CSV" : "Export CSV"}
               </button>
             }>
-            <DataTable data={filtered} page={page} setPage={setPage} sortCol={sortCol} sortDir={sortDir}
+            <DataTable data={filtered} page={page} setPage={setPage} sortCol={sortCol} sortDir={sortDir} isMobile={isMobile}
               onSort={(col) => { if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortCol(col); setSortDir("asc"); } setPage(0); }} />
           </ChartCard>
         </div>
