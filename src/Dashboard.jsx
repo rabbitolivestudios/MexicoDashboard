@@ -44,9 +44,12 @@ const Badge = ({ text, color, onRemove }) => (
   </span>
 );
 
-const Dropdown = ({ label, options, selected, onChange, color }) => {
+const Dropdown = ({ label, options, selected, onChange, grouped }) => {
   const [open, setOpen] = useState(false);
-  const filtered = options.filter(o => !selected.includes(o));
+  const filtered = grouped
+    ? grouped.map(g => ({ ...g, items: g.items.filter(o => !selected.includes(o)) })).filter(g => g.items.length > 0)
+    : null;
+  const flatFiltered = grouped ? null : options.filter(o => !selected.includes(o));
   return (
     <div style={{ position: "relative", display: "inline-block" }}>
       <button onClick={() => setOpen(!open)} style={{ background: selected.length ? "#dbeafe" : "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#334155", display: "flex", alignItems: "center", gap: 4 }}>
@@ -54,9 +57,19 @@ const Dropdown = ({ label, options, selected, onChange, color }) => {
         <span style={{ fontSize: 10 }}>▼</span>
       </button>
       {open && (
-        <div style={{ position: "absolute", top: "100%", left: 0, zIndex: 999, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,.12)", maxHeight: 260, overflowY: "auto", minWidth: 220, marginTop: 4 }}>
+        <div style={{ position: "absolute", top: "100%", left: 0, zIndex: 999, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,.12)", maxHeight: 340, overflowY: "auto", minWidth: 260, marginTop: 4 }}>
           {selected.length > 0 && <div onClick={() => { onChange([]); setOpen(false); }} style={{ padding: "8px 12px", cursor: "pointer", color: "#dc2626", fontSize: 12, borderBottom: "1px solid #f1f5f9" }}>Clear all</div>}
-          {filtered.map(o => (
+          {grouped ? filtered.map(g => (
+            <div key={g.label}>
+              <div style={{ padding: "6px 12px", fontSize: 11, fontWeight: 700, color: "#fff", background: g.color || "#475569", position: "sticky", top: 0 }}>{g.label}</div>
+              {g.items.map(o => (
+                <div key={o} onClick={() => { onChange([...selected, o]); }} style={{ padding: "6px 12px 6px 20px", cursor: "pointer", fontSize: 12, borderBottom: "1px solid #f8fafc" }}
+                  onMouseEnter={e => e.target.style.background = "#f1f5f9"} onMouseLeave={e => e.target.style.background = "transparent"}>
+                  {o}
+                </div>
+              ))}
+            </div>
+          )) : flatFiltered.map(o => (
             <div key={o} onClick={() => { onChange([...selected, o]); }} style={{ padding: "7px 12px", cursor: "pointer", fontSize: 13, borderBottom: "1px solid #f8fafc" }}
               onMouseEnter={e => e.target.style.background = "#f1f5f9"} onMouseLeave={e => e.target.style.background = "transparent"}>
               {o}
@@ -239,13 +252,49 @@ export default function Dashboard() {
   const allOwners = useMemo(() => {
     const oc = {};
     MILLS.forEach(m => { oc[m.owner] = (oc[m.owner] || 0) + 1; });
-    return Object.entries(oc).sort((a, b) => b[1] - a[1]).slice(0, 50).map(([o]) => o);
+    return Object.entries(oc).sort((a, b) => a[0].localeCompare(b[0])).map(([o]) => o);
   }, []);
   const allProducts = useMemo(() => {
     const pc = {};
     MILLS.forEach(m => m.products.forEach(p => { pc[p] = (pc[p] || 0) + 1; }));
-    return Object.entries(pc).sort((a, b) => b[1] - a[1]).slice(0, 60).map(([p]) => p);
+    return Object.entries(pc).sort((a, b) => a[0].localeCompare(b[0])).map(([p]) => p);
   }, []);
+
+  // Products grouped by steel type category for the dropdown
+  const groupedProducts = useMemo(() => {
+    // Build product -> set of steelTypes mapping
+    const productTypes = {};
+    MILLS.forEach(m => m.products.forEach(p => {
+      if (!productTypes[p]) productTypes[p] = new Set();
+      productTypes[p].add(m.simpleType);
+    }));
+    // Define groups with their products
+    const groups = [
+      { label: "Flats", color: COLORS.Flats, types: ["Flats"] },
+      { label: "Longs", color: COLORS.Longs, types: ["Longs"] },
+      { label: "Flats & Longs", color: COLORS["Flats & Longs"], types: ["Flats & Longs"] },
+      { label: "Stainless", color: COLORS.Stainless, types: ["Stainless", "Stainless / Special"] },
+      { label: "Pipes / Tubes", color: COLORS["Pipes / Tubes"], types: ["Pipes / Tubes"] },
+      { label: "Special / SBQ", color: COLORS["Special / SBQ"], types: ["Special / SBQ"] },
+      { label: "Semis / DRI", color: "#6b7280", types: ["Semis / DRI"] },
+      { label: "Heavy Plates", color: COLORS["Heavy Plates"], types: ["Heavy Plates"] },
+      { label: "Service Centers", color: COLORS["Service Centers"], types: ["Service Centers"] },
+    ];
+    const assigned = new Set();
+    const result = groups.map(g => {
+      const items = allProducts.filter(p => {
+        const st = productTypes[p];
+        if (!st) return false;
+        return g.types.some(t => st.has(t));
+      }).filter(p => !assigned.has(p));
+      items.forEach(p => assigned.add(p));
+      return { label: g.label, color: g.color, items: items.sort() };
+    }).filter(g => g.items.length > 0);
+    // Add "Other" group for unassigned
+    const other = allProducts.filter(p => !assigned.has(p)).sort();
+    if (other.length) result.push({ label: "Other", color: "#94a3b8", items: other });
+    return result;
+  }, [allProducts]);
 
   const filtered = useMemo(() => {
     let result = MILLS;
@@ -348,7 +397,7 @@ export default function Dashboard() {
         <Dropdown label="Region" options={allRegions} selected={filterRegion} onChange={setRegion} />
         <Dropdown label="Country" options={allCountries} selected={filterCountry} onChange={setCountry} />
         <Dropdown label="Steel Type" options={allTypes} selected={filterType} onChange={setType} />
-        <Dropdown label="Product" options={allProducts} selected={filterProduct} onChange={setProduct} />
+        <Dropdown label="Product" options={allProducts} selected={filterProduct} onChange={setProduct} grouped={groupedProducts} />
         <Dropdown label="Owner" options={allOwners} selected={filterOwner} onChange={setOwner} />
         <div style={{ width: 1, height: 28, background: "#e2e8f0" }} />
         <Dropdown label="FTA Status" options={allFTA} selected={filterFTA} onChange={setFTA} />
@@ -506,12 +555,15 @@ export default function Dashboard() {
 
         {/* Trade Intelligence Note */}
         <div style={{ marginTop: 16, background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 12, padding: "14px 20px" }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#92400e", marginBottom: 6 }}>Trade Intelligence Notes (Mexico 2026)</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#92400e", marginBottom: 6 }}>Trade Intelligence Notes — SE Catalog (Mexico 2026)</div>
           <div style={{ fontSize: 12, color: "#78350f", lineHeight: 1.6 }}>
-            Mexico maintains <strong>14 FTAs with 50+ countries</strong>. FTA partners (USMCA, EU, CPTPP, EFTA, Pacific Alliance, etc.) enjoy <strong>0% preferential tariff</strong> on steel imports.
-            Non-FTA countries face <strong>25-50% MFN tariffs</strong> under the 2026 LIGIE reform (effective Jan 1, 2026).
-            Steel products (HS 72-73) generally face <strong>35% MFN</strong> for flat/long products, <strong>50% for wire rod</strong>, <strong>25% for semis/castings</strong>, and <strong>10-20% for raw materials and specialty alloys</strong>.
-            Active anti-dumping investigations include HRC from China/Vietnam. AD duties apply to seamless pipes from India ($206.7/mt), South Korea ($131.2/mt), and Ukraine ($170.1/mt).
+            <strong>Source: Secretar&iacute;a de Econom&iacute;a (SE) — Catalog of Approved Mills.</strong> FTA partners: <strong>T-MEC/USMCA</strong> (USA, Canada), <strong>TLCUEM</strong> (EU), <strong>CPTPP</strong> (Japan, Australia, etc.) enjoy <strong>0% preferential tariff</strong>.
+            Non-FTA countries face <strong>25-50% MFN tariffs</strong> under the 2026 LIGIE reform.{" "}
+            <strong>Anti-dumping duties (A/D):</strong>{" "}
+            HRC — China $354/mt, Germany $133-166/mt, France $75.59/mt, Russia 21%, Ukraine 25%.{" "}
+            CRC — China 65.39-103.91%, South Korea quota 700k mt, Russia 15%.{" "}
+            Coated — China 22.26-76.33%.{" "}
+            Plate — Russia 12.5-36.8%, Romania $0.676/mt.
           </div>
         </div>
 
